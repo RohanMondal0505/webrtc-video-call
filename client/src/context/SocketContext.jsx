@@ -65,14 +65,17 @@ const SocketProvider = ({ children }) => {
 		});
 
 		socket.on("callEnded", () => {
-			setCallEnded(true);
-			// Play beep when call ends
-			audioNotification.playEndCallBeep();
-			connectionRef.current?.destroy();
-			// Delay reload to allow beep to play
-			setTimeout(() => {
-				window.location.reload();
-			}, 500);
+			// Only reload if there was an active call
+			if (callAccepted) {
+				setCallEnded(true);
+				// Play beep when call ends
+				audioNotification.playEndCallBeep();
+				connectionRef.current?.destroy();
+				// Delay reload to allow beep to play
+				setTimeout(() => {
+					window.location.reload();
+				}, 500);
+			}
 		});
 	}, []);
 
