@@ -5,7 +5,7 @@ import audioNotification from "../utils/audioNotification";
 
 const SocketContext = createContext();
 
-const socket = io("http://localhost:6200");
+const socket = io(import.meta.env.VITE_SOCKET_URL || "http://localhost:6200");
 
 const SocketProvider = ({ children }) => {
 	const [callAccepted, setCallAccepted] = useState(false);
