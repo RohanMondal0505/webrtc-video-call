@@ -1,6 +1,7 @@
 import { createContext, useEffect, useRef, useState } from "react";
 import Peer from "simple-peer";
 import { io } from "socket.io-client";
+import audioNotification from "../utils/audioNotification";
 
 const SocketContext = createContext();
 
@@ -27,17 +28,23 @@ const SocketProvider = ({ children }) => {
 	const screenTrackRef = useRef();
 
 	useEffect(() => {
-		navigator.mediaDevices.getUserMedia({ video: true, audio: true }).then((currentStream) => {
-			setStream(currentStream);
-			if (myVideo.current) {
-				myVideo.current.srcObject = currentStream;
-			}
-		});
+		navigator.mediaDevices
+			.getUserMedia({ video: true, audio: true })
+			.then((currentStream) => {
+				console.log("Media stream obtained:", currentStream);
+				setStream(currentStream);
+			})
+			.catch((error) => {
+				console.error("Error accessing media devices:", error);
+				alert(`Camera/Microphone access denied: ${error.message}`);
+			});
 
 		socket.on("me", (id) => setMe(id));
 
 		socket.on("callUser", ({ from, name: callerName, signal }) => {
 			setCall({ isReceivingCall: true, from, name: callerName, signal });
+			// Play ringtone when receiving a call
+			audioNotification.playRingtone();
 		});
 
 		socket.on("updateUserMedia", ({ type, currentMediaStatus }) => {
@@ -59,18 +66,42 @@ const SocketProvider = ({ children }) => {
 
 		socket.on("callEnded", () => {
 			setCallEnded(true);
+			// Play beep when call ends
+			audioNotification.playEndCallBeep();
 			connectionRef.current?.destroy();
-			window.location.reload();
+			// Delay reload to allow beep to play
+			setTimeout(() => {
+				window.location.reload();
+			}, 500);
 		});
 	}, []);
 
+	// Separate effect to attach stream to video element when both are ready
+	useEffect(() => {
+		if (stream && myVideo.current) {
+			console.log("Attaching stream to video element");
+			myVideo.current.srcObject = stream;
+			myVideo.current.play().catch((err) => {
+				console.error("Error playing video:", err);
+			});
+		}
+	}, [stream]);
+
 	const answerCall = () => {
+		// Stop ringtone when answering
+		audioNotification.stopRingtone();
 		setCallAccepted(true);
 		setOtherUser(call.from);
 		const peer = new Peer({ initiator: false, trickle: false, stream });
 
 		peer.on("signal", (data) => {
-			socket.emit("answerCall", { signal: data, to: call.from, userName: name, type: "both", myMediaStatus: [myMicStatus, myVdoStatus] });
+			socket.emit("answerCall", {
+				signal: data,
+				to: call.from,
+				userName: name,
+				type: "both",
+				myMediaStatus: [myMicStatus, myVdoStatus],
+			});
 		});
 
 		peer.on("stream", (currentStream) => {
@@ -169,9 +200,14 @@ const SocketProvider = ({ children }) => {
 
 	const leaveCall = () => {
 		setCallEnded(true);
+		// Play beep when leaving call
+		audioNotification.playEndCallBeep();
 		connectionRef.current.destroy();
 		socket.emit("endCall", { id: otherUser });
-		window.location.reload();
+		// Delay reload to allow beep to play
+		setTimeout(() => {
+			window.location.reload();
+		}, 500);
 	};
 
 	return (
@@ -197,8 +233,7 @@ const SocketProvider = ({ children }) => {
 				userMicStatus,
 				handleScreenSharing,
 				screenShare,
-			}}
-		>
+			}}>
 			{children}
 		</SocketContext.Provider>
 	);
