@@ -16,7 +16,7 @@ const io = new Server(server, {
 	},
 });
 
-const PORT = process.env.PORT || 5001;
+const PORT = process.env.PORT || 6200;
 const startTime = Date.now();
 
 // Track active connections
